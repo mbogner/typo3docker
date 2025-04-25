@@ -42,5 +42,7 @@ RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/typo3.ini && \
     echo "post_max_size=50M" >> /usr/local/etc/php/conf.d/typo3.ini
 
 COPY fpm_entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY enable_setup.sh /usr/local/bin/enable_setup
+COPY disable_setup.sh /usr/local/bin/disable_setup
+RUN chmod +x /entrypoint.sh /usr/local/bin/enable_setup /usr/local/bin/disable_setup
 ENTRYPOINT ["/entrypoint.sh"]

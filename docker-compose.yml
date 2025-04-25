@@ -5,8 +5,8 @@ services:
     hostname: nginx
     container_name: nginx
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./ssl.conf:/etc/nginx/includes/ssl.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl.conf:/etc/nginx/includes/ssl.conf:ro
       - ./certificates:/etc/nginx/certs:ro
       - fpm_data:/var/www/html:rw
     ports:
@@ -24,7 +24,9 @@ services:
       retries: 10
 
   fpm:
-    build: .
+    build:
+      context: ./fpm
+      dockerfile: Dockerfile
     image: mbopm/typo3docker:latest
     hostname: fpm
     container_name: fpm
@@ -44,11 +46,19 @@ services:
       TYPO3_SERVER_TYPE: other
       TYPO3_BACKEND_PATH: /admin
       TYPO3_DISPLAY_ERRORS: 1
+      TYPO3_MAIL_TRANSPORT: smtp
+      TYPO3_MAIL_TRANSPORT_SMTP_SERVER: mail:1025
+      TYPO3_MAIL_TRANSPORT_SMTP_USERNAME: smtp
+      TYPO3_MAIL_TRANSPORT_SMTP_PASSWORD: pass123
+      TYPO3_MAIL_TRANSPORT_SMTP_ENCRYPT: ''
+      TYPO3_DEFAULT_MAIL_FROM_ADDRESS: typo3@example.com
     volumes:
       - fpm_data:/var/www/html:rw
     depends_on:
       db:
         condition: service_healthy
+    links:
+      - mail
     healthcheck:
       test: [ "CMD", "php-fpm", "-t" ]
       interval: 2s
@@ -74,6 +84,33 @@ services:
       timeout: 5s
       retries: 10
 
+  # http://smtp:pass123@127.0.0.1:8025
+  mail:
+    image: axllent/mailpit:v1.24
+    container_name: mail
+    hostname: mail
+    ports:
+      - "127.0.0.1:8025:8025"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./mailpit/auth:/auth:ro
+      - mailpit_data:/data:rw
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ALLOW_INSECURE: true
+      MP_UI_AUTH_FILE: /auth
+      MP_SMTP_AUTH_FILE: /auth
+      MP_SMTP_DISABLE_RDNS: true
+      TZ: UTC
+    healthcheck:
+      test: wget --spider --tries 1 http://smtp:pass123@localhost:8025
+      interval: 1s
+      timeout: 1s
+      start_interval: 1s
+      retries: 5
+
 volumes:
   db_data:
   fpm_data:
+  mailpit_data:
