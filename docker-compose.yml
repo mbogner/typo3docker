@@ -1,0 +1,76 @@
+services:
+
+  nginx:
+    image: nginx:latest
+    hostname: nginx
+    container_name: nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./certificates:/etc/nginx/certs:ro
+      - fpm_data:/var/www/html:rw
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    depends_on:
+      fpm:
+        condition: service_healthy
+    extra_hosts:
+      - "localhost.mbo.dev:127.0.0.1"
+    healthcheck:
+      test: [ "CMD", "curl", "-k", "-f", "https://localhost.mbo.dev" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  fpm:
+    build: .
+    image: mbopm/typo3docker:latest
+    hostname: fpm
+    container_name: fpm
+    environment:
+      TYPO3_DB_DRIVER: postgres
+      TYPO3_DB_USERNAME: typo3
+      TYPO3_DB_PORT: 5432
+      TYPO3_DB_HOST: db
+      TYPO3_DB_DBNAME: typo3
+      DB_PASSWORD: typo3
+      TYPO3_SETUP_ADMIN_EMAIL: admin@example.com
+      TYPO3_SETUP_ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: 12345Tgb!
+      TYPO3_SETUP_CREATE_SITE: "https://localhost.mbo.dev"
+      TRUSTED_HOST_PATTERN: '^localhost\.mbo\.dev$'
+      TYPO3_PROJECT_NAME: Test
+      TYPO3_SERVER_TYPE: other
+    volumes:
+      - fpm_data:/var/www/html:rw
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "php-fpm", "-t" ]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  db:
+    image: postgres:17-alpine
+    container_name: postgres
+    hostname: postgres
+    environment:
+      POSTGRES_DB: typo3
+      POSTGRES_USER: typo3
+      POSTGRES_PASSWORD: typo3
+      PGDATA: /var/lib/postgresql/data/pgdata
+      PGTZ: UTC
+      TZ: UTC
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U typo3 -d typo3" ]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
+  fpm_data:
