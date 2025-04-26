@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libxslt1-dev \
     libpq-dev \
+    cron \
+    procps \
     && docker-php-ext-install -j$(nproc) \
     pdo \
     pdo_pgsql \
@@ -42,7 +44,10 @@ RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/typo3.ini && \
     echo "post_max_size=50M" >> /usr/local/etc/php/conf.d/typo3.ini
 
 COPY fpm_entrypoint.sh /entrypoint.sh
-COPY enable_setup.sh /usr/local/bin/enable_setup
-COPY disable_setup.sh /usr/local/bin/disable_setup
-RUN chmod +x /entrypoint.sh /usr/local/bin/enable_setup /usr/local/bin/disable_setup
+COPY scripts/* /usr/local/bin/
+RUN chmod +x /entrypoint.sh /usr/local/bin/*.sh
+
 ENTRYPOINT ["/entrypoint.sh"]
+
+ENV TYPO3_HOME=/var/www/html
+ENV PATH="${PATH}:${TYPO3_HOME}/vendor/bin"

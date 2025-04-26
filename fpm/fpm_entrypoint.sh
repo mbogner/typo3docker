@@ -2,20 +2,24 @@
 set -e
 
 # Check if public/index.php exists
-if [ ! -f /var/www/html/public/index.php ]; then
+if [ ! -f "$TYPO3_HOME"/public/index.php ]; then
   echo "No TYPO3 installation found in volume, setting up..."
-  composer create-project typo3/cms-base-distribution /var/www/html ^13 --no-dev --no-interaction
-  chown -R www-data:www-data /var/www/html
+  composer create-project typo3/cms-base-distribution "$TYPO3_HOME" ^13 --no-dev --no-interaction
+  chown -R www-data:www-data "$TYPO3_HOME"
   echo "Running TYPO3 setup..."
   vendor/bin/typo3 setup \
       --admin-user-password "$ADMIN_PASSWORD" \
       --password "$DB_PASSWORD"
-  chown -R www-data:www-data /var/www/html
+  chown -R www-data:www-data "$TYPO3_HOME"
+
+  echo "Installing extensions..."
+  composer require typo3/cms-scheduler
+  vendor/bin/typo3 extension:setup --no-interaction
 fi
 
 # Patch settings.php if it exists
-if [ -f /var/www/html/config/system/settings.php ]; then
-  echo "Patching /var/www/html/config/system/settings.php..."
+if [ -f "$TYPO3_HOME"/config/system/settings.php ]; then
+  echo "Patching $TYPO3_HOME/config/system/settings.php..."
   # shellcheck disable=SC2016
   php -r '
     $cfgFile = "/var/www/html/config/system/settings.php";
@@ -35,13 +39,22 @@ if [ -f /var/www/html/config/system/settings.php ]; then
 
     file_put_contents($cfgFile, "<?php return " . var_export($cfg, true) . ";");
   '
-
-  # Clear TYPO3 caches after patch
-  echo "Clearing TYPO3 caches..."
-  rm -rf /var/www/html/var/cache/*
 fi
 
-chmod 2775 /var/www/html
-chmod 2775 /var/www/html/public
+echo "Starting Cron..."
+cat <<EOF | tee /etc/cron.d/typo3_scheduler
+
+* * * * * www-data /usr/local/bin/php /var/www/html/vendor/bin/typo3 scheduler:run --no-interaction
+
+EOF
+chmod 0644 /etc/cron.d/typo3_scheduler
+service cron start
+
+echo "Clearing TYPO3 caches..."
+rm -rf "$TYPO3_HOME"/var/cache/*
+
+chown -R www-data:www-data "$TYPO3_HOME"
+chmod 2775 "$TYPO3_HOME"
+chmod 2775 "$TYPO3_HOME"/public
 
 exec php-fpm

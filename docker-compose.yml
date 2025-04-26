@@ -61,7 +61,7 @@ services:
       - mail
     healthcheck:
       test: [ "CMD", "php-fpm", "-t" ]
-      interval: 2s
+      interval: 5s
       timeout: 2s
       retries: 10
 
@@ -80,9 +80,9 @@ services:
       - db_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U typo3 -d typo3" ]
-      interval: 1s
+      interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 5
 
   # http://smtp:pass123@127.0.0.1:8025
   mail:
